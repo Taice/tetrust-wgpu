@@ -9,6 +9,6 @@
 - clone repository
 - just compile using rust: `cargo build --release`
 ## running
- if you have want to download the binary you can refer to the downloads section to download it. (only on windows and linux, you're gonna have to build for your own platform otherwise)
+ if you want to download the binary you can refer to the downloads section to download it. (only on windows and linux, you're gonna have to build for your own platform otherwise)
 
  otherwise just run from the cloned repository `cargo run --release`
