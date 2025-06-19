@@ -1,7 +1,5 @@
 pub mod tetromino_kind;
 
-use std::ops::Add;
-
 use tetromino_kind::TetrominoKind;
 
 use super::point::Point;
