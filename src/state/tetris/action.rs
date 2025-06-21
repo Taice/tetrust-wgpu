@@ -1,7 +1,6 @@
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Action {
-    MoveLeft,
-    MoveRight,
+    Move(f32),
     Rotate(f32),
     HardDrop,
     Reset,

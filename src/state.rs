@@ -231,12 +231,13 @@ impl State {
         #[allow(clippy::single_match)]
         match (key, pressed) {
             (KeyCode::Space, true) => self.tetris.process_action(Action::HardDrop),
-            (KeyCode::ArrowLeft, true) => self.tetris.process_action(Action::MoveLeft),
-            (KeyCode::ArrowRight, true) => self.tetris.process_action(Action::MoveRight),
+            (KeyCode::ArrowLeft, true) => self.tetris.process_action(Action::Move(-1.)),
+            (KeyCode::ArrowRight, true) => self.tetris.process_action(Action::Move(1.)),
             (KeyCode::ArrowUp, true) => self.tetris.process_action(Action::Rotate(90_f32.to_radians())),
             (KeyCode::ArrowDown, true) => self.tetris.process_action(Action::Rotate(-90_f32.to_radians())),
             (KeyCode::KeyP, true) => self.pause = !self.pause,
             (KeyCode::KeyH, true) => self.tetris.process_action(Action::Hold),
+            (KeyCode::KeyA, true) => self.tetris.toggle_autoplay(),
 
             (KeyCode::Escape, true) => event_loop.exit(),
             (KeyCode::ShiftLeft, true) => self.soft = true,
