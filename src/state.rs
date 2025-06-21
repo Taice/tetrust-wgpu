@@ -2,7 +2,7 @@ mod tetris;
 
 use super::vertex::Vertex;
 use std::{cmp::Ordering, iter, sync::Arc};
-use tetris::Tetris;
+use tetris::{Tetris, action::Action};
 use wgpu::util::DeviceExt;
 use winit::{event_loop::ActiveEventLoop, keyboard::KeyCode, window::Window};
 
@@ -19,6 +19,7 @@ pub struct State {
     pub window: Arc<Window>,
 
     soft: bool,
+    pause: bool,
     tetris: Tetris,
 }
 
@@ -199,6 +200,7 @@ impl State {
             num_indices,
             window,
 
+            pause: false,
             soft: false,
             tetris: Tetris::new(),
         };
@@ -218,26 +220,28 @@ impl State {
     }
 
     pub fn update(&mut self) {
-        if self.tetris.update(self.soft) {
+        if !self.pause && self.tetris.update(self.soft) {
             self.new_vertices();
         }
     }
 
+    #[rustfmt::skip]
     pub fn handle_key(&mut self, event_loop: &ActiveEventLoop, key: KeyCode, pressed: bool) {
         let mut done = true;
         #[allow(clippy::single_match)]
         match (key, pressed) {
+            (KeyCode::Space, true) => self.tetris.process_action(Action::HardDrop),
+            (KeyCode::ArrowLeft, true) => self.tetris.process_action(Action::MoveLeft),
+            (KeyCode::ArrowRight, true) => self.tetris.process_action(Action::MoveRight),
+            (KeyCode::ArrowUp, true) => self.tetris.process_action(Action::Rotate(90_f32.to_radians())),
+            (KeyCode::ArrowDown, true) => self.tetris.process_action(Action::Rotate(-90_f32.to_radians())),
+            (KeyCode::KeyP, true) => self.pause = !self.pause,
+            (KeyCode::KeyH, true) => self.tetris.process_action(Action::Hold),
+
             (KeyCode::Escape, true) => event_loop.exit(),
-            (KeyCode::Space, true) => self.tetris.hard_fall(),
-            (KeyCode::ArrowLeft, true) => self.tetris.move_left(),
-            (KeyCode::ArrowRight, true) => self.tetris.move_right(),
             (KeyCode::ShiftLeft, true) => self.soft = true,
             (KeyCode::ShiftLeft, false) => self.soft = false,
-            (KeyCode::ArrowUp, true) => self.tetris.rotate(90_f32.to_radians()),
-            (KeyCode::ArrowDown, true) => self.tetris.rotate(-90_f32.to_radians()),
-            _ => {
-                done = self.tetris.update(self.soft);
-            }
+            _ => done = false,
         }
         if done {
             self.new_vertices();

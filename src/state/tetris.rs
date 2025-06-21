@@ -1,12 +1,14 @@
+pub mod action;
 pub mod bag;
 pub mod cell;
 pub mod point;
 pub mod tetromino;
 
+use action::Action;
 use bag::Bag;
 use cell::Cell;
 use point::Point;
-use tetromino::Tetromino;
+use tetromino::{Tetromino, tetromino_kind::TetrominoKind};
 
 use std::{
     fmt::Display,
@@ -15,13 +17,17 @@ use std::{
 
 const FALL_TIME: u64 = 1000;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct Tetris {
     pub board: [[Cell; 10]; 20],
     pub tetro: Tetromino,
     pub bag: Bag,
 
+    moved: bool,
+    hold: Option<TetrominoKind>,
     fall_timer: Instant,
+
+    autoplay: Option<Vec<Action>>,
 }
 
 impl Default for Tetris {
@@ -31,6 +37,9 @@ impl Default for Tetris {
             tetro: Tetromino::default(),
             bag: Bag::default(),
             fall_timer: Instant::now(),
+            moved: false,
+            hold: None,
+            autoplay: None,
         }
     }
 }
@@ -48,14 +57,19 @@ impl Tetris {
     }
 
     pub fn rotate(&mut self, radians: f32) {
-        for x in [0.0, 1.0, -1.0] {
-            let mut new = self.tetro;
-            new.anchor.x += x;
-            new.rotate(radians);
+        let mut new = self.tetro;
+        new.rotate(radians);
+        for y in [0.0, 1.0, -1.0] {
+            for x in [0.0, 1.0, -1.0] {
+                new.anchor.x += x;
+                new.anchor.y += y;
 
-            if self.is_valid(Some(&new)) {
-                self.tetro = new;
-                break;
+                if self.is_valid(Some(&new)) {
+                    self.tetro = new;
+                    break;
+                }
+                new.anchor.x -= x;
+                new.anchor.y -= y;
             }
         }
     }
@@ -72,17 +86,19 @@ impl Tetris {
         }
     }
 
-    pub fn move_left(&mut self) {
-        self.tetro.anchor.x -= 1.0;
-        if !self.is_valid(None) {
-            self.tetro.anchor.x += 1.0;
+    pub fn move_x(&mut self, x: f32) -> bool {
+        let before = self.fall_tetro(None);
+        self.tetro.anchor.x += x;
+
+        let is_valid = self.is_valid(None);
+        if !is_valid {
+            self.tetro.anchor.x -= x;
         }
-    }
-    pub fn move_right(&mut self) {
-        self.tetro.anchor.x += 1.0;
-        if !self.is_valid(None) {
-            self.tetro.anchor.x -= 1.0;
+
+        if before && !self.fall_tetro(None) {
+            self.fall_timer = Instant::now();
         }
+        is_valid
     }
 
     /// This function checks where a tetromino would hard fall to and returns the amount of y you
@@ -111,6 +127,7 @@ impl Tetris {
             self.reset();
         }
         self.fix_board();
+        self.moved = false;
     }
 
     fn fix_board(&mut self) {
@@ -125,7 +142,7 @@ impl Tetris {
             if thing {
                 let mut prev = [Cell::Empty; 10];
                 for y in 0..=i {
-                    std::mem::swap(&mut prev, &mut self.board[y]);
+                    (prev, self.board[y]) = (self.board[y], prev);
                 }
             }
         }
@@ -161,14 +178,58 @@ impl Tetris {
         true
     }
 
+    /// returns true if something changed; signaling to the renderer that it needs to update
     pub fn update(&mut self, soft: bool) -> bool {
-        let time = FALL_TIME - if soft { 920 } else { 0 };
+        let time = FALL_TIME
+            - if soft && self.fall_tetro(None) {
+                920
+            } else {
+                0
+            };
         if self.fall_timer.elapsed() > Duration::from_millis(time) {
             self.fall();
             self.fall_timer = Instant::now();
             true
         } else {
             false
+        }
+    }
+
+    pub fn hold(&mut self) {
+        if !self.moved {
+            let kind = self.tetro.kind;
+
+            if let Some(hold) = self.hold {
+                self.tetro = Tetromino::from_kind(hold);
+            } else {
+                self.tetro = Tetromino::from_kind(self.bag.next());
+            }
+
+            self.hold = Some(kind);
+            self.moved = true;
+        }
+    }
+
+    pub fn process_action(&mut self, action: Action) {
+        match action {
+            Action::MoveLeft => {
+                self.move_x(-1.0);
+            }
+            Action::MoveRight => {
+                self.move_x(1.0);
+            }
+            Action::Rotate(radians) => {
+                self.rotate(radians);
+            }
+            Action::HardDrop => {
+                self.hard_fall();
+            }
+            Action::Reset => {
+                self.reset();
+            }
+            Action::Hold => {
+                self.hold();
+            }
         }
     }
 

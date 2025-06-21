@@ -9,6 +9,8 @@ pub struct Tetromino {
     pub points: [Point<f32>; 4],
     pub anchor: Point<f32>,
     pub color: [f32; 3],
+
+    pub kind: TetrominoKind,
 }
 
 impl Tetromino {
@@ -23,6 +25,7 @@ impl Tetromino {
                 ],
                 anchor: Point::new(4.5, 0.5),
                 color: [0.19, 0.65, 0.80],
+                kind,
             },
             TetrominoKind::O => Self {
                 points: [
@@ -33,6 +36,7 @@ impl Tetromino {
                 ],
                 anchor: Point::new(4.5, 0.5),
                 color: [0.80, 0.70, 0.03],
+                kind,
             },
             TetrominoKind::S => Self {
                 points: [
@@ -43,6 +47,7 @@ impl Tetromino {
                 ],
                 anchor: Point::new(4., 0.),
                 color: [0.26, 0.71, 0.26],
+                kind,
             },
             TetrominoKind::Z => Self {
                 points: [
@@ -53,6 +58,7 @@ impl Tetromino {
                 ],
                 anchor: Point::new(4., 0.),
                 color: [0.80, 0.13, 0.16],
+                kind,
             },
             TetrominoKind::J => Self {
                 points: [
@@ -63,6 +69,7 @@ impl Tetromino {
                 ],
                 anchor: Point::new(4., 0.),
                 color: [0.35, 0.4, 0.68],
+                kind,
             },
             TetrominoKind::L => Self {
                 points: [
@@ -73,6 +80,7 @@ impl Tetromino {
                 ],
                 anchor: Point::new(4., 0.),
                 color: [0.80, 0.40, 0.10],
+                kind,
             },
             TetrominoKind::T => Self {
                 points: [
@@ -83,6 +91,7 @@ impl Tetromino {
                 ],
                 anchor: Point::new(4., 0.),
                 color: [0.68, 0.3, 0.61],
+                kind,
             },
         }
     }
