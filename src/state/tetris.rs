@@ -10,7 +10,6 @@ use bag::Bag;
 use board::Board;
 use cell::Cell;
 use point::Point;
-use rand::Rng;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use tetromino::{Tetromino, tetromino_kind::TetrominoKind};
 
@@ -92,7 +91,7 @@ impl Tetris {
     pub fn genetically_modify(&mut self) {
         let mut before = self.get_avg();
         loop {
-            for i in 0..4 {
+            for i in 0..5 {
                 self.board.increase_weight(i, 0.5);
                 let after = self.get_avg();
 
@@ -171,6 +170,7 @@ impl Tetris {
     // get permutations for auto-play
     pub fn get_autoplay(&self) -> Vec<Action> {
         let mut final_vec = vec![];
+        let mut string = String::default();
 
         // let mut max = 0.;
         let mut max = f32::MIN;
@@ -190,9 +190,11 @@ impl Tetris {
                 let mut new_actions = actions.clone();
                 let mut new_new = new.clone();
                 new_new.tetro.anchor.y += new_new.hard_fall_tetro(None);
-                new_new.engrave();
-                let grade = new_new.board.grade();
+                let lines = new_new.board.get_rows_cleared();
+                new_new.finish();
+                let grade = new_new.board.grade(self.board.get_holes(), lines as f32);
                 if grade >= max {
+                    string = format!("{}", new_new.board);
                     max = grade;
                     new_actions.push(Action::HardDrop);
                     final_vec = new_actions;
