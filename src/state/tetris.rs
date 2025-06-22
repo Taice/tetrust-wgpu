@@ -10,10 +10,13 @@ use bag::Bag;
 use board::Board;
 use cell::Cell;
 use point::Point;
+use rand::Rng;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use tetromino::{Tetromino, tetromino_kind::TetrominoKind};
 
 use std::{
     collections::HashMap,
+    thread,
     time::{Duration, Instant},
 };
 
@@ -64,25 +67,56 @@ impl Tetris {
     fn autoplay(&mut self) -> u32 {
         loop {
             let actions = self.get_autoplay();
-            for action in actions {
-                if let Some(lines) = self.process_action(action) {
+            for action in actions.iter().rev() {
+                if let Some(lines) = self.process_action(*action) {
                     return lines;
                 }
             }
+            thread::sleep(Duration::from_millis(1));
         }
     }
 
-    fn get_avg(&self) -> f32 {
-        let mut avg = 0.0;
-        let mut new = self.clone();
-        for x in 0..100 {
-            scores.push(new.autoplay());
+    pub fn get_avg(&self) -> f32 {
+        let results: Vec<f32> = (0..100)
+            .into_par_iter()
+            .map(|_| {
+                let mut cloned = self.clone();
+                cloned.autoplay() as f32
+            })
+            .collect();
+
+        let sum: f32 = results.iter().sum();
+        sum / results.len() as f32
+    }
+
+    pub fn genetically_modify(&mut self) {
+        let mut before = self.get_avg();
+        loop {
+            for i in 0..4 {
+                self.board.increase_weight(i, 0.5);
+                let after = self.get_avg();
+
+                if after > before {
+                    before = after;
+                } else {
+                    self.board.increase_weight(i, -1.0);
+                    let after = self.get_avg();
+                    if after > before {
+                        before = after;
+                    } else {
+                        // reset because its not better
+                        self.board.increase_weight(i, 0.5);
+                    }
+                }
+                self.board.print_weights();
+            }
         }
     }
 
     pub fn rotate(&mut self, radians: f32) {
         let mut new = self.tetro;
         new.rotate(radians);
+
         for y in [0.0, 1.0, -1.0] {
             for x in [0.0, 1.0, -1.0] {
                 new.anchor.x += x;
@@ -194,7 +228,6 @@ impl Tetris {
         self.engrave();
         self.tetro = Tetromino::from_kind(self.bag.next());
         if !self.is_valid(None) {
-            println!("lines: {}", self.lines);
             let lines = self.lines;
             self.reset();
             self.lines = 0;
@@ -323,6 +356,7 @@ impl Tetris {
                 self.hold();
                 None
             }
+            _ => None,
         }
     }
 
@@ -360,7 +394,7 @@ fn compile_actions(actions: &Vec<Action>) -> Vec<Action> {
     let mut final_vec = vec![Action::HardDrop];
     let mut map = HashMap::new();
     for action in actions {
-        if let Action::Move(x) = action {
+        if let Action::Move(_) = action {
             *map.entry(action).or_insert(1) += 1;
         }
     }

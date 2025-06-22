@@ -5,4 +5,5 @@ pub enum Action {
     HardDrop,
     Reset,
     Hold,
+    None,
 }

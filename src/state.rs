@@ -228,16 +228,19 @@ impl State {
     #[rustfmt::skip]
     pub fn handle_key(&mut self, event_loop: &ActiveEventLoop, key: KeyCode, pressed: bool) {
         let mut done = true;
+        let mut action = Action::None;
         #[allow(clippy::single_match)]
         match (key, pressed) {
-            (KeyCode::Space, true) => self.tetris.process_action(Action::HardDrop),
-            (KeyCode::ArrowLeft, true) => self.tetris.process_action(Action::Move(-1)),
-            (KeyCode::ArrowRight, true) => self.tetris.process_action(Action::Move(1)),
-            (KeyCode::ArrowUp, true) => self.tetris.process_action(Action::Rotate(90)),
-            (KeyCode::ArrowDown, true) => self.tetris.process_action(Action::Rotate(-90)),
+            (KeyCode::Space, true) => action = Action::HardDrop,
+            (KeyCode::ArrowLeft, true) => action = Action::Move(-1),
+            (KeyCode::ArrowRight, true) => action = Action::Move(1),
+            (KeyCode::ArrowUp, true) => action = Action::Rotate(90),
+            (KeyCode::ArrowDown, true) => action = Action::Rotate(-90),
+            (KeyCode::KeyH, true) => action = Action::Hold,
+
             (KeyCode::KeyP, true) => self.pause = !self.pause,
-            (KeyCode::KeyH, true) => self.tetris.process_action(Action::Hold),
             (KeyCode::KeyA, true) => self.tetris.toggle_autoplay(),
+            (KeyCode::KeyG, true) => self.tetris.genetically_modify(),
 
             (KeyCode::Escape, true) => event_loop.exit(),
             (KeyCode::ShiftLeft, true) => self.soft = true,
@@ -245,6 +248,7 @@ impl State {
             _ => done = false,
         }
         if done {
+            self.tetris.process_action(action);
             self.new_vertices();
         }
     }
