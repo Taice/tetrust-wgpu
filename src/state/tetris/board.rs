@@ -5,11 +5,10 @@ use std::{
 
 use crate::state::tetris::cell::Cell;
 
-const LINE_CLEAR_WEIGHT: f32 = 1.0;
-const HEIGHT_DIFFERENCE_WEIGHT: f32 = 0.5;
-const HEIGHT_WEIGHT: f32 = 0.5;
-const HOLES_WEIGHT: f32 = 1.0;
-const HORIZONTAL_HOLES_WEIGHT: f32 = 0.5;
+const LINE_CLEAR_WEIGHT: f32 = 2.0;
+const HEIGHT_DIFFERENCE_WEIGHT: f32 = 1.2;
+const HEIGHT_WEIGHT: f32 = 1.3;
+const HOLES_WEIGHT: f32 = 2.0;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Board {
@@ -17,7 +16,6 @@ pub struct Board {
     pub height_difference_weight: f32,
     pub height_weight: f32,
     pub holes_weight: f32,
-    pub horizontal_holes_weight: f32,
     pub board: [[Cell; 10]; 20],
 }
 
@@ -28,68 +26,24 @@ impl Default for Board {
             height_difference_weight: HEIGHT_DIFFERENCE_WEIGHT,
             height_weight: HEIGHT_WEIGHT,
             holes_weight: HOLES_WEIGHT,
-            horizontal_holes_weight: HORIZONTAL_HOLES_WEIGHT,
             board: [[Cell::default(); 10]; 20],
         }
     }
 }
 
 impl Board {
-    pub fn print_weights(&self) {
-        println!("line_clear_weight: {}", self.line_clear_weight);
-        println!("HDW: {}", self.height_difference_weight);
-        println!("height_weight: {}", self.height_weight);
-        println!("holes_weight: {}", self.holes_weight);
-        println!("horizontal_holes_weight: {}", self.horizontal_holes_weight);
-    }
-
-    pub fn increase_weight(&mut self, i: u8, amount: f32) {
-        match i {
-            0 => self.line_clear_weight += amount,
-            1 => self.height_difference_weight += amount,
-            2 => self.height_weight += amount,
-            3 => self.holes_weight += amount,
-            4 => self.horizontal_holes_weight += amount,
-            _ => unreachable!(),
-        }
-    }
-
     /// + Kolk linow cleara move
     /// + avg height
     /// - lukne
-    pub fn grade(&self, holes_before: f32, lines_cleared: f32) -> f32 {
-        let holes = self.get_holes() - holes_before;
-        let holes_grade = (holes).powf(self.holes_weight);
+    pub fn grade(&self, lines_cleared: f32) -> f32 {
+        let holes = self.get_holes();
+        let holes_grade = (holes + 1.0).recip().powf(self.holes_weight);
         let line_grade = (lines_cleared * 2.).powf(self.line_clear_weight);
         let heights = self.get_heights();
-        let diff_grade = (self.get_diff()).powf(self.height_difference_weight);
-        let max_grade = (heights.0 as f32).powf(self.height_weight);
-        let horizontal_holes_grade =
-            (self.get_holes_horizontal()).powf(self.horizontal_holes_weight);
+        let diff_grade = (self.get_diff()).recip().powf(self.height_difference_weight);
+        let max_grade = (heights.0 as f32).recip().powf(self.height_weight);
 
-        line_grade - diff_grade - max_grade - holes_grade - horizontal_holes_grade
-    }
-
-    fn get_holes_horizontal(&self) -> f32 {
-        let mut lukne = 0.0;
-        for row in self.board {
-            let mut thing = false;
-            for cell in row {
-                match cell {
-                    Cell::Empty => {
-                        if !thing {
-                            thing = false;
-                        }
-                    }
-                    Cell::Filled(_) => {
-                        if thing {
-                            lukne += 1.0
-                        }
-                    }
-                }
-            }
-        }
-        lukne
+        line_grade + diff_grade + max_grade + holes_grade
     }
 
     fn get_diff(&self) -> f32 {

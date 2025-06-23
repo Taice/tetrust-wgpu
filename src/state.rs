@@ -237,10 +237,11 @@ impl State {
             (KeyCode::ArrowUp, true) => action = Action::Rotate(90),
             (KeyCode::ArrowDown, true) => action = Action::Rotate(-90),
             (KeyCode::KeyH, true) => action = Action::Hold,
+            (KeyCode::KeyS, true) => action = Action::SoftDrop,
 
             (KeyCode::KeyP, true) => self.pause = !self.pause,
             (KeyCode::KeyA, true) => self.tetris.toggle_autoplay(),
-            (KeyCode::KeyG, true) => self.tetris.genetically_modify(),
+            (KeyCode::KeyR, true) => self.tetris.reset(),
 
             (KeyCode::Escape, true) => event_loop.exit(),
             (KeyCode::ShiftLeft, true) => self.soft = true,

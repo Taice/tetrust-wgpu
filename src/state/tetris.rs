@@ -5,22 +5,17 @@ pub mod cell;
 pub mod point;
 pub mod tetromino;
 
+use std::time::{Duration, Instant};
+
 use action::Action;
 use bag::Bag;
 use board::Board;
 use cell::Cell;
 use point::Point;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use tetromino::{Tetromino, tetromino_kind::TetrominoKind};
 
-use std::{
-    collections::HashMap,
-    thread,
-    time::{Duration, Instant},
-};
-
 const FALL_TIME: u64 = 1000;
-const AUTOPLAY_SPEED: u64 = 10;
+const AUTOPLAY_SPEED: u64 = 100;
 
 #[derive(Debug, Clone)]
 pub struct Tetris {
@@ -63,55 +58,6 @@ impl Tetris {
         }
     }
 
-    fn autoplay(&mut self) -> u32 {
-        loop {
-            let actions = self.get_autoplay();
-            for action in actions.iter().rev() {
-                if let Some(lines) = self.process_action(*action) {
-                    return lines;
-                }
-            }
-            thread::sleep(Duration::from_millis(1));
-        }
-    }
-
-    pub fn get_avg(&self) -> f32 {
-        let results: Vec<f32> = (0..100)
-            .into_par_iter()
-            .map(|_| {
-                let mut cloned = self.clone();
-                cloned.autoplay() as f32
-            })
-            .collect();
-
-        let sum: f32 = results.iter().sum();
-        sum / results.len() as f32
-    }
-
-    pub fn genetically_modify(&mut self) {
-        let mut before = self.get_avg();
-        loop {
-            for i in 0..5 {
-                self.board.increase_weight(i, 0.5);
-                let after = self.get_avg();
-
-                if after > before {
-                    before = after;
-                } else {
-                    self.board.increase_weight(i, -1.0);
-                    let after = self.get_avg();
-                    if after > before {
-                        before = after;
-                    } else {
-                        // reset because its not better
-                        self.board.increase_weight(i, 0.5);
-                    }
-                }
-                self.board.print_weights();
-            }
-        }
-    }
-
     pub fn rotate(&mut self, radians: f32) {
         let mut new = self.tetro;
         new.rotate(radians);
@@ -132,7 +78,7 @@ impl Tetris {
     }
 
     /// returns lines cleared if reset
-    pub fn hard_fall(&mut self) -> Option<u32> {
+    pub fn hard_drop(&mut self) -> Option<u32> {
         self.tetro.anchor.y += self.hard_fall_tetro(None);
         self.finish()
     }
@@ -170,40 +116,80 @@ impl Tetris {
     // get permutations for auto-play
     pub fn get_autoplay(&self) -> Vec<Action> {
         let mut final_vec = vec![];
-        let mut string = String::default();
 
-        // let mut max = 0.;
         let mut max = f32::MIN;
+
         for rotation in 0..4 {
-            let mut actions = Vec::new();
+            // hard dropping
+            let rotation_action = Action::Rotate(rotation * 90);
             let mut new = self.clone();
             new.rotate(rotation as f32 * std::f32::consts::FRAC_PI_2);
-            actions.push(Action::Rotate(rotation * 90));
 
-            while new.move_x(-1.0) {
-                actions.push(Action::Move(-1));
-            }
-            actions.push(Action::Move(-1));
-            new.tetro.anchor.x -= 1.0;
-            while new.move_x(1.0) {
-                actions.push(Action::Move(1));
-                let mut new_actions = actions.clone();
+            for x in [-1.0, 1.0] {
+                let mut moves = vec![rotation_action];
                 let mut new_new = new.clone();
-                new_new.tetro.anchor.y += new_new.hard_fall_tetro(None);
-                let lines = new_new.board.get_rows_cleared();
-                new_new.finish();
-                let grade = new_new.board.grade(self.board.get_holes(), lines as f32);
-                if grade >= max {
-                    string = format!("{}", new_new.board);
-                    max = grade;
-                    new_actions.push(Action::HardDrop);
-                    final_vec = new_actions;
+                new_new.tetro.anchor.x -= x;
+                while new_new.move_x(x) {
+                    let mut curr = new_new.clone();
+
+                    curr.tetro.anchor.y += curr.hard_fall_tetro(None);
+                    let lines = curr.board.get_rows_cleared();
+                    curr.finish();
+
+                    let grade = curr.board.grade(lines as f32);
+
+                    if grade > max {
+                        let mut new_vec = moves.clone();
+                        new_vec.push(Action::HardDrop);
+                        max = grade;
+                        final_vec = new_vec;
+                    }
+
+                    moves.push(Action::Move(x as i32));
+                }
+            }
+        }
+        for rotation in 0..4 {
+            let rotation_action = Action::Rotate(rotation * 90);
+            let mut new = self.clone();
+            new.rotate(rotation as f32 * std::f32::consts::FRAC_PI_2);
+
+            for x in [-1.0, 1.0] {
+                let mut moves = vec![rotation_action];
+                let mut new_new = new.clone();
+                new_new.tetro.anchor.x -= x;
+                while new_new.move_x(x) {
+                    for x in [1.0, -1.0] {
+                        let mut curr = new_new.clone();
+                        curr.process_action(Action::SoftDrop);
+
+                        let mut actions = moves.clone();
+                        actions.push(Action::SoftDrop);
+                        while curr.move_x(x) {
+                            actions.push(Action::Move(x as i32));
+
+                            let mut new = curr.clone();
+                            new.tetro.anchor.y += curr.hard_fall_tetro(None);
+                            let lines = new.board.get_rows_cleared();
+                            new.finish();
+
+                            let grade = new.board.grade(lines as f32);
+
+                            if grade > max {
+                                actions.push(Action::HardDrop);
+                                max = grade;
+                                final_vec = actions.clone();
+                                actions.pop();
+                            }
+                        }
+                    }
+                    moves.push(Action::Move(x as i32));
                 }
             }
         }
 
         final_vec.reverse();
-        compile_actions(&final_vec)
+        final_vec
     }
 
     /// This function checks where a tetromino would hard fall to and returns the amount of y you
@@ -289,8 +275,7 @@ impl Tetris {
         true
     }
 
-    /// returns true if something changed; signaling to the renderer that it needs to update
-    pub fn update(&mut self, soft: bool) -> bool {
+    fn autoplay(&mut self) -> bool {
         let mut thing = false;
         if let Some((mut vec, mut timer)) = self.autoplay.clone() {
             if timer.elapsed() >= Duration::from_millis(AUTOPLAY_SPEED) {
@@ -307,6 +292,12 @@ impl Tetris {
             self.autoplay = Some((vec, timer));
             thing = true;
         }
+        thing
+    }
+
+    /// returns true if something changed; signaling to the renderer that it needs to update
+    pub fn update(&mut self, soft: bool) -> bool {
+        let thing = self.autoplay();
 
         let time = FALL_TIME
             - if soft && self.fall_tetro(None) {
@@ -349,9 +340,10 @@ impl Tetris {
                 self.rotate((degrees as f32).to_radians());
                 None
             }
-            Action::HardDrop => self.hard_fall(),
-            Action::Reset => {
-                self.reset();
+            Action::HardDrop => self.hard_drop(),
+            Action::SoftDrop => {
+                self.tetro.anchor.y += self.hard_fall_tetro(None);
+                self.fall_timer = Instant::now();
                 None
             }
             Action::Hold => {
@@ -390,28 +382,4 @@ impl Tetris {
     pub fn reset(&mut self) {
         *self = Self::new();
     }
-}
-
-fn compile_actions(actions: &Vec<Action>) -> Vec<Action> {
-    let mut final_vec = vec![Action::HardDrop];
-    let mut map = HashMap::new();
-    for action in actions {
-        if let Action::Move(_) = action {
-            *map.entry(action).or_insert(1) += 1;
-        }
-    }
-    let left_count = map.get(&Action::Move(-1)).unwrap_or(&0);
-    let right_count = map.get(&Action::Move(1)).unwrap_or(&0);
-    if *left_count > *right_count {
-        for _ in 0..*left_count - *right_count {
-            final_vec.push(Action::Move(-1));
-        }
-    } else if *right_count > *left_count {
-        for _ in 0..*right_count - *left_count {
-            final_vec.push(Action::Move(1));
-        }
-    }
-
-    final_vec.push(*actions.last().unwrap());
-    final_vec
 }

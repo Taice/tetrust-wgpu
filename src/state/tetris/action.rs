@@ -3,7 +3,7 @@ pub enum Action {
     Move(i32),
     Rotate(i32),
     HardDrop,
-    Reset,
+    SoftDrop,
     Hold,
     None,
 }
