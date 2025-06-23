@@ -37,7 +37,7 @@ impl Board {
     /// - lukne
     pub fn grade(&self, lines_cleared: f32) -> f32 {
         let holes = self.get_holes();
-        let holes_grade = (holes + 1.0).recip().powf(self.holes_weight);
+        let holes_grade = (holes).recip().powf(self.holes_weight);
         let line_grade = (lines_cleared * 2.).powf(self.line_clear_weight);
         let heights = self.get_heights();
         let diff_grade = (self.get_diff()).recip().powf(self.height_difference_weight);
